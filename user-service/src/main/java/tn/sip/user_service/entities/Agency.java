@@ -43,6 +43,8 @@ public class Agency {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    private boolean isPaymentApproved;
+
     public void setSubscriptionDates(Subscription subscription) {
         this.startDate = LocalDate.now();
         this.endDate = this.startDate.plusMonths(subscription.getDurationInMonths());

@@ -3,14 +3,12 @@ package tn.sip.user_service.servicesImpl;
 import java.beans.Transient;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import tn.sip.user_service.dto.AgencyDTO;
 import tn.sip.user_service.dto.DocumentsDTO;
 import tn.sip.user_service.entities.Agency;
 import tn.sip.user_service.entities.User;
@@ -21,15 +19,13 @@ import tn.sip.user_service.services.AgencyService;
 import tn.sip.user_service.services.EmailService;
 
 @Service
+@RequiredArgsConstructor
 public class AgencyServiceImpl implements AgencyService {
-	@Autowired
-	private AgencyRepository agencyRepository;
-	@Autowired
-	private EmailService emailService;
-	@Autowired
-	private SubscriptionClient subscriptionClient;
-    @Autowired
-    private AgencyMapper agencyMapper;
+
+	private final AgencyRepository agencyRepository;
+	private final EmailService emailService;
+	private final SubscriptionClient subscriptionClient;
+    private final AgencyMapper agencyMapper;
 
 	@Override
 		public DocumentsDTO getAgencyDocumentsByUserId(DocumentsDTO documents, User user) {
@@ -58,11 +54,9 @@ public class AgencyServiceImpl implements AgencyService {
 	    }
 
 	@Override
-	public AgencyDTO getAgencyById(Long id) {
+	public Agency getAgencyById(Long id) {
 		 Agency agency = agencyRepository.findById(id).orElse(null);
-		 AgencyDTO dto = agencyMapper.toAgencyDTO(agency);
-		 dto.setUserId(agency.getUser().getId());
-		return dto;
+		return agency;
 	}
 
 	@Override
@@ -110,6 +104,18 @@ public class AgencyServiceImpl implements AgencyService {
 				System.out.println("L'agence " + agency.getAgencyName() + " n'a pas de date d'expiration définie.");
 			}
 		}
+	}
+
+	@Override
+	public boolean updatePaymentApproval(Long agencyId, boolean approved) {
+		Optional<Agency> agencyOptional = agencyRepository.findById(agencyId);
+		if (agencyOptional.isEmpty()) {
+			return false;
+		}
+		Agency agency = agencyOptional.get();
+		agency.setPaymentApproved(approved);
+		agencyRepository.save(agency);
+		return true;
 	}
 
 

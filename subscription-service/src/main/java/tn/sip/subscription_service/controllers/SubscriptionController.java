@@ -9,8 +9,8 @@ import tn.sip.subscription_service.services.SubscriptionService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/subscriptions")
-@CrossOrigin(origins = "http://localhost:4200")
+@RequestMapping("/subscriptions")
+//@CrossOrigin(origins = "http://localhost:4200")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;

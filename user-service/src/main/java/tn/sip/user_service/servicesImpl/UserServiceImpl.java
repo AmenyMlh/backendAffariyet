@@ -1,19 +1,24 @@
 package tn.sip.user_service.servicesImpl;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.web.multipart.MultipartFile;
 import tn.sip.user_service.dto.*;
 import tn.sip.user_service.entities.Agency;
 import tn.sip.user_service.entities.Subscription;
@@ -32,9 +37,13 @@ import tn.sip.user_service.services.EmailService;
 import tn.sip.user_service.services.UserService;
 
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 	@Value("${front.url}")
     private String frontUrl;
+    //@Value("${file.uploads.photos-output-path}")
+    //private String uploadsDirectory;
+    private final FileStorageService fileStorageService;
 	private final UserRepository userRepository;
     private final EmailService emailService;
 	private final BCryptPasswordEncoder bCryptPasswordEncoder;
@@ -49,16 +58,11 @@ public class UserServiceImpl implements UserService {
     private static final long EXPIRY_TIME = 15 * 60 * 1000;
     @Autowired
     private TokenRepository tokenRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public String getFrontUrl() {
         return frontUrl;
-    }
-
-    public UserServiceImpl(UserRepository userRepository, EmailService emailService, BCryptPasswordEncoder bCryptPasswordEncoder,AgencyService agencyService) {
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-        this.bCryptPasswordEncoder = bCryptPasswordEncoder;
-        this.agencyService = agencyService;
     }
 
     @Override
@@ -77,8 +81,9 @@ public class UserServiceImpl implements UserService {
              if (user.getRole() == UserRole.AGENCY) {
                  Agency agency = agencyRepository.findByUser(user);
                  if (agency != null) {
-                	 userDTO.setAgencyDTO(AgencyMapper.INSTANCE.toAgencyDTO(agency));
+                     userDTO.setAgencyDTO(AgencyMapper.INSTANCE.toAgencyDTO(agency));
                  }
+
              }
 
              return Optional.of(userDTO);
@@ -89,11 +94,36 @@ public class UserServiceImpl implements UserService {
 
 
 
-     @Override
-     public Optional<UserDTO> getUserByEmail(String email) {
-         User user = userRepository.findByEmail(email);
-         return (user != null) ? getUserById(user.getId()) : Optional.empty();
-     }
+    @Override
+    public Optional<UserDTO> getUserByEmail(String email) {
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            return Optional.empty();
+        }
+
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setFirstName(user.getFirstName());
+        dto.setLastName(user.getLastName());
+        dto.setEmail(user.getEmail());
+        dto.setPhoneNumber(user.getPhoneNumber());
+        dto.setRole(user.getRole());
+        dto.setCinFile(user.getCinFile());
+        dto.setProfilePicture(user.getProfilePicture());
+        dto.setEnabled(user.isEnabled());
+        dto.setApproved(user.isApproved());
+
+        if (user.getRole() == UserRole.AGENCY) {
+            Agency agency = agencyRepository.findByUser(user);
+            if (agency != null) {
+                dto.setAgencyDTO(AgencyMapper.INSTANCE.toAgencyDTO(agency));
+            }
+        }
+
+        return Optional.of(dto);
+    }
+
+
 
     @Override
     @Transactional
@@ -189,64 +219,85 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public User updateUser(Long userId, UserUpdateRequest request) {
         User existingUser = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        existingUser.setFirstName(request.getFirstName());
-        existingUser.setLastName(request.getLastName());
-        existingUser.setEmail(request.getEmail());
-        existingUser.setPhoneNumber(request.getPhoneNumber());
-        existingUser.setCinFile(request.getCinFile());
-
-        if (existingUser.getRole() == UserRole.AGENCY) {
-            Agency existingAgency = agencyRepository.findByUser(existingUser);
-
-            if (existingAgency != null && request.getAgency() != null) {
-                existingAgency.setAgencyName(request.getAgency().getAgencyName());
-                existingAgency.setRneFile(request.getAgency().getRneFile());
-                existingAgency.setPatenteFile(request.getAgency().getPatenteFile());
-
-                agencyRepository.save(existingAgency);
-            }
-        }
-
-        return userRepository.save(existingUser);
-    }
-
-    @Transactional
-    @Override
-    public User updateUserWithoutPass(Long userId, UserUpdateRequest request) {
-        User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         existingUser.setFirstName(request.getFirstName());
         existingUser.setLastName(request.getLastName());
         existingUser.setEmail(request.getEmail());
         existingUser.setPhoneNumber(request.getPhoneNumber());
-        existingUser.setCinFile(request.getCinFile());
 
-        if (existingUser.getRole() == UserRole.AGENCY) {
-            Agency existingAgency = agencyRepository.findByUser(existingUser);
-
-            if (existingAgency != null && request.getAgency() != null) {
-                existingAgency.setAgencyName(request.getAgency().getAgencyName());
-                existingAgency.setRneFile(request.getAgency().getRneFile());
-                existingAgency.setPatenteFile(request.getAgency().getPatenteFile());
-
-                agencyRepository.save(existingAgency);
-                agencyRepository.flush();
-
-                if (existingUser.getCinFile() != null &&
-                        existingAgency.getRneFile() != null &&
-                        existingAgency.getPatenteFile() != null) {
-                    messagingTemplate.convertAndSend(
-                            "/topic/admin-notifications",
-                            "L'agence " + existingAgency.getAgencyName() + " a complété tous ses documents."
-                    );
-                }
+        // 📁 Sauvegarde du fichier CIN
+        if (request.getCinFile() != null && !request.getCinFile().isEmpty()) {
+            try {
+                String cinUrl = fileStorageService.saveFile("cin", "/api/user/users/files/cin/", request.getCinFile());
+                existingUser.setCinFile(cinUrl);
+            } catch (IOException e) {
+                throw new RuntimeException("Erreur lors du téléchargement du fichier CIN", e);
             }
         }
 
+        // 🏢 Mise à jour agence si nécessaire
+        if (existingUser.getRole() == UserRole.AGENCY) {
+            Agency existingAgency = agencyRepository.findByUser(existingUser);
+
+            if (existingAgency != null) {
+                existingAgency.setAgencyName(request.getAgencyName());
+
+                try {
+                    if (request.getRneFile() != null && !request.getRneFile().isEmpty()) {
+                        String rneUrl = fileStorageService.saveFile("rne", "/api/user/users/files/rne/", request.getRneFile());
+                        existingAgency.setRneFile(rneUrl);
+                    }
+
+                    if (request.getPatenteFile() != null && !request.getPatenteFile().isEmpty()) {
+                        String patenteUrl = fileStorageService.saveFile("patente", "/api/user/users/files/patente/", request.getPatenteFile());
+                        existingAgency.setPatenteFile(patenteUrl);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException("Erreur lors du téléchargement des fichiers agence", e);
+                }
+
+                agencyRepository.save(existingAgency);
+            }
+        }
+
+
         return userRepository.save(existingUser);
+    }
+
+
+
+    @Transactional
+    @Override
+    public void updateUserPassword(Long userId, String newPassword) {
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("Le mot de passe ne peut pas être vide.");
+        }
+
+        // Encodage du mot de passe
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        existingUser.setPassword(encodedPassword);
+
+        userRepository.save(existingUser);
+    }
+
+    @Override
+    public String uploadProfilePicture(MultipartFile file, Long userId) throws IOException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+
+        if (user.getProfilePicture() != null && !user.getProfilePicture().isEmpty()) {
+            String oldFileName = fileStorageService.extractFileNameFromUrl(user.getProfilePicture());
+            fileStorageService.deleteFile("profilePictures", oldFileName);
+        }
+        String fileUrl = fileStorageService.saveFile("profilePictures", "api/user/users/profilePicture/", file);
+        user.setProfilePicture(fileUrl);
+        userRepository.save(user);
+
+        return fileUrl;
     }
 
 
@@ -332,8 +383,14 @@ public class UserServiceImpl implements UserService {
 
             user.setApproved(true);
             userRepository.save(user);
-            messagingTemplate.convertAndSend("/topic/user-"+userId, "Votre compte a été approuvé !");
-        }
+            messagingTemplate.convertAndSend("/topic/agency-notifications/"+userId, "Votre compte a été approuvé !");
+        emailService.sendEmail(
+                user.getEmail(),
+                "Approbation de votre compte",
+                "Bonjour,\n\nNous avons le plaisir de vous informer que votre compte a été approuvé suite à la validation de vos documents.\n\nMerci pour votre confiance.\n\nL'équipe Support."
+        );
+
+    }
 
     @Override
     @Transactional
@@ -379,6 +436,10 @@ public class UserServiceImpl implements UserService {
         tokenRepository.delete(token);
     }
 
+    @Override
+    public List<User> findAllAdmins() {
+        return userRepository.findByRole(UserRole.ADMIN);
+    }
 
 
 

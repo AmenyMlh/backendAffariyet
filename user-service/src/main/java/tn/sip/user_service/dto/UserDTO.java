@@ -23,5 +23,7 @@ public class UserDTO {
 
     private String cinFile;
 
+    private String profilePicture;
+
     private AgencyDTO agencyDTO;
 }

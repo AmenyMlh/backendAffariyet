@@ -17,5 +17,5 @@ public class AgencyDTO {
 
 	    private boolean	isPaymentApproved;
 
-	    private Long userId;
+	    private UserDTO user;
 }

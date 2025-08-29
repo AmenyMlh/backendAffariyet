@@ -58,6 +58,8 @@ public class User implements UserDetails {
     @Column(name = "cin")
     private String cinFile;
 
+    private String profilePicture;
+
 
     @Override
     public boolean isAccountNonExpired() {

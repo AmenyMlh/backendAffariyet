@@ -4,6 +4,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
 import tn.sip.user_service.dto.UserDTO;
+import tn.sip.user_service.dto.UserUpdateRequest;
+import tn.sip.user_service.entities.Agency;
 import tn.sip.user_service.entities.User;
 
 import java.util.List;
@@ -16,4 +18,7 @@ public interface UserMapper {
     User toUser(UserDTO userDTO);
     List<User> toUsers(List<UserDTO> usersDTO);
     List<UserDTO> toUsersDTO(List<User> users);
+
+
+
 }

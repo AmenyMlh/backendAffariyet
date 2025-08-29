@@ -15,4 +15,7 @@ public interface SubscriptionClient {
 
     @GetMapping("/api/subscriptions/{id}")
     Subscription getSubscriptionById(@PathVariable Long id);
+
+    @GetMapping("/api/payments/agency/{agencyId}")
+    Subscription getPaymentByAgency(@PathVariable Long agencyId);
 }

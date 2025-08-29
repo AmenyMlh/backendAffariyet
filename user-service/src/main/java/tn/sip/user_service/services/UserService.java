@@ -1,8 +1,12 @@
 package tn.sip.user_service.services;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import tn.sip.user_service.dto.*;
 import tn.sip.user_service.entities.User;
 
@@ -38,7 +42,13 @@ public interface UserService {
 
 	void resetPassword(String email, String resetToken, String newPassword);
 
-	User updateUserWithoutPass(Long userId, UserUpdateRequest request);
+	//User updateUserWithoutPass(Long userId, UserUpdateRequest request);
+
+    void updateUserPassword(Long userId, String newPassword);
+
+	String uploadProfilePicture(MultipartFile file, Long userId) throws IOException;
 
 	boolean changePassword(Long userId, ChangePasswordRequest request);
+
+    List<User> findAllAdmins();
 }

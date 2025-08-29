@@ -1,25 +1,22 @@
 package tn.sip.property_service.servicesImpl;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import tn.sip.property_service.entities.Property;
+import tn.sip.property_service.enums.PropertyStatus;
+import tn.sip.property_service.enums.PropertyType;
 import tn.sip.property_service.repositories.PropertyRepository;
 import tn.sip.property_service.services.PropertyService;
 
 @Service
+@RequiredArgsConstructor
 public class PropertyServiceImpl implements PropertyService {
 	private final PropertyRepository propertyRepository;
-
-    public PropertyServiceImpl(PropertyRepository propertyRepository) {
-        this.propertyRepository = propertyRepository;
-    }
-
 
     @Override
     public List<Property> getAllProperties() {
@@ -30,7 +27,12 @@ public class PropertyServiceImpl implements PropertyService {
     public Property getPropertyById(Long id) {
         return propertyRepository.findById(id).orElseThrow(() -> new RuntimeException("Property not found"));
     }
-    
+
+    @Override
+    public List<Property> getPropertiesByAgencyId(Long agencyId) {
+        return propertyRepository.findPropertiesByAgencyId(agencyId);
+    }
+
     @Override
     public Property addProperty(Property property) {
 
@@ -56,6 +58,9 @@ public class PropertyServiceImpl implements PropertyService {
         existingProperty.setBathNumb(property.getBathNumb());
         existingProperty.setPiecesNumb(property.getPiecesNumb());
         existingProperty.setKitchenNumb(property.getKitchenNumb());
+        existingProperty.setNbrEtage(property.getNbrEtage());
+        existingProperty.setArea(property.getArea());
+
         return propertyRepository.save(existingProperty);
     }
 
@@ -64,5 +69,42 @@ public class PropertyServiceImpl implements PropertyService {
         propertyRepository.deleteById(id);
     }
 
+    @Override
+    public long countPropertiesByStatusAndAgencyId(PropertyStatus status, Long agencyId) {
+        return propertyRepository.countByPropertyStatusAndAgencyId(status, agencyId);
+    }
 
+
+    @Override
+    public long countPropertiesByLocation(String location, Long agencyId) {
+        return propertyRepository.countPropertiesByLocationAndAgencyId(location,agencyId);
+    }
+
+    @Override
+    public Long getAgencyIdByProperty(Long propertyId) {
+        return propertyRepository.getAgencyIdByPropertyId(propertyId);
+    }
+
+    @Override
+    public Long getTotalProperties(Long agencyId) {
+        return propertyRepository.countPropertiesByAgency(agencyId);
+    }
+
+    @Override
+    public Map<String, Long> getPropertiesByType(Long agencyId) {
+        List<Object[]> results = propertyRepository.countPropertiesByType(agencyId);
+        return results.stream().collect(Collectors.toMap(
+                r -> ((PropertyType) r[0]).name(),
+                r -> (Long) r[1]
+        ));
+    }
+
+    @Override
+    public Map<String, Long> getPropertiesByStatus(Long agencyId) {
+        List<Object[]> results = propertyRepository.countPropertiesByStatus(agencyId);
+        return results.stream().collect(Collectors.toMap(
+                r -> ((PropertyStatus) r[0]).name(),
+                r -> (Long) r[1]
+        ));
+    }
 }

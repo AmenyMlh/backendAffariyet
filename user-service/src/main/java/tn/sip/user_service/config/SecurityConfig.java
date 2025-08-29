@@ -1,5 +1,7 @@
 package tn.sip.user_service.config;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -56,10 +58,8 @@ public class SecurityConfig {
         http.csrf().disable()
                 .authorizeRequests()
                     .requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers("/users/**").permitAll()
-                    .requestMatchers("/admin/**").hasRole("ADMIN")
-                    .requestMatchers("/user/**").hasAnyRole("INDIVIDUAL")
-                    .requestMatchers("/agence/**").hasAnyRole("AGENCY")
+                    .requestMatchers("/api/users/**").permitAll()
+                    .requestMatchers("/api/follows/**").permitAll()
                     .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/swagger-resources/**", "/swagger-resources", "/api-docs/**").permitAll()
                 .and()
                     .logout()
@@ -72,6 +72,7 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {

@@ -1,28 +1,28 @@
 package tn.sip.user_service.controllers;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import org.springframework.web.multipart.MultipartFile;
 import tn.sip.user_service.config.JwtTokenProvider;
 import tn.sip.user_service.dto.*;
 import tn.sip.user_service.entities.Agency;
@@ -35,27 +35,19 @@ import tn.sip.user_service.services.UserService;
 import tn.sip.user_service.servicesImpl.UserDetailsServiceImpl;
 
 @RestController
-@RequestMapping("/api/users")
-@CrossOrigin(origins = "http://localhost:4200")
-
+@RequestMapping("/users")
+@RequiredArgsConstructor
+//@CrossOrigin(origins = "http://localhost:4200")
 public class UserController {
-	 @Autowired
-	    private UserService userService;
-	 @Autowired
-	 private AgencyService agencyService;
-	 @Autowired
-	 private BCryptPasswordEncoder bCryptPasswordEncoder;
-	 @Autowired
-	 private NotificationController notificationController;
-	 private final JwtTokenProvider jwtTokenProvider;
-	 private final UserDetailsServiceImpl userDetailsService;
-     private final UserMapper userMapper;
 
-	public UserController(JwtTokenProvider jwtTokenProvider, UserDetailsServiceImpl userDetailsService,UserMapper userMapper) {
-	        this.jwtTokenProvider = jwtTokenProvider;
-	        this.userDetailsService = userDetailsService;
-			this.userMapper = userMapper;
-	    }
+	    private final UserService userService;
+	 private final AgencyService agencyService;
+	 private final BCryptPasswordEncoder bCryptPasswordEncoder;
+	 private final JwtTokenProvider jwtTokenProvider;
+	@Value("${file.uploads.photos-output-path}")
+	private String fileUploadPath;
+
+
 	 @GetMapping
 	    public ResponseEntity<List<User>> getAllUsers() {
 	        List<User> users = userService.getAllUsers();
@@ -153,7 +145,7 @@ public class UserController {
 
 
 	@PostMapping("/add")
-	public ResponseEntity<User> createUser(@RequestBody RegisterRequest registerRequest) {
+	public ResponseEntity<?> createUser(@RequestBody RegisterRequest registerRequest) {
 		try {
 			User newUser = new User();
 			newUser.setFirstName(registerRequest.getFirstName());
@@ -170,23 +162,83 @@ public class UserController {
 
 			return ResponseEntity.status(HttpStatus.CREATED).body(newUser);
 		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+			String errorMessage = "Erreur lors de la création de l'utilisateur : " + e.getMessage();
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorMessage);
 		}
+	}
+
+	@PutMapping(value = "/update/{userId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<User> updateUser(
+			@PathVariable Long userId,
+			@ModelAttribute UserUpdateRequest request) {
+		User updatedUser = userService.updateUser(userId, request);
+		return ResponseEntity.ok(updatedUser);
+	}
+
+	@PostMapping(value = "/upload-profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<Map<String, String>> uploadProfilePicture(
+			@RequestParam("file") MultipartFile file,
+			@RequestParam("userId") Long userId
+	) throws IOException {
+		String profilePictureUrl = userService.uploadProfilePicture(file, userId);
+		Map<String, String> response = new HashMap<>();
+		response.put("message", "Profile picture uploaded successfully");
+		response.put("profilePictureUrl", profilePictureUrl);
+		return ResponseEntity.ok(response);
+	}
+
+	@GetMapping(path = "/profilePicture/{fileName}")
+	public ResponseEntity<byte[]> getProfilePicture(@PathVariable("fileName") String fileName) throws IOException {
+		Path imagePath = Paths.get(fileUploadPath).resolve("profilePictures").resolve(fileName).normalize();
+
+		if (!Files.exists(imagePath) || !Files.isReadable(imagePath)) {
+			return ResponseEntity.notFound().build();
+		}
+
+		byte[] fileContent = Files.readAllBytes(imagePath);
+		String mimeType = Files.probeContentType(imagePath);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CONTENT_TYPE, mimeType);
+
+		return new ResponseEntity<>(fileContent, headers, HttpStatus.OK);
+	}
+
+	@GetMapping(path = "/files/cin/{fileName}")
+	public ResponseEntity<byte[]> getCinFile(@PathVariable("fileName") String fileName) throws IOException {
+		return getFileResponse("cin", fileName);
+	}
+
+	@GetMapping(path = "/files/rne/{fileName}")
+	public ResponseEntity<byte[]> getRneFile(@PathVariable("fileName") String fileName) throws IOException {
+		return getFileResponse("rne", fileName);
+	}
+
+	@GetMapping(path = "/files/patente/{fileName}")
+	public ResponseEntity<byte[]> getPatenteFile(@PathVariable("fileName") String fileName) throws IOException {
+		return getFileResponse("patente", fileName);
+	}
+
+
+	private ResponseEntity<byte[]> getFileResponse(String folder, String fileName) throws IOException {
+		Path filePath = Paths.get(fileUploadPath).resolve(folder).resolve(fileName).normalize();
+
+		if (!Files.exists(filePath) || !Files.isReadable(filePath)) {
+			return ResponseEntity.notFound().build();
+		}
+
+		byte[] fileContent = Files.readAllBytes(filePath);
+		String mimeType = Files.probeContentType(filePath);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CONTENT_TYPE, mimeType);
+
+		return new ResponseEntity<>(fileContent, headers, HttpStatus.OK);
 	}
 
 
 
-
-
-	@PutMapping("/{id}")
-	    public ResponseEntity<User> updateUser(
-	        @PathVariable Long id,
-	        @RequestBody UserUpdateRequest request) {
-
-	        User savedUser = userService.updateUserWithoutPass(id, request);
-	        return ResponseEntity.ok(savedUser);
-	    }
-	    @GetMapping("/not-approved")
+	@GetMapping("/not-approved")
 	    public ResponseEntity<List<UserDTO>> getNotApprovedUsersWithDocuments() {
 	        List<UserDTO> users = userService.getNotApprovedUsersWithDocuments();
 	        return new ResponseEntity<>(users, HttpStatus.OK);
@@ -216,7 +268,7 @@ public class UserController {
 	        return agencyService.getAgencyByUser(user);
 	    }
 	@GetMapping("/get/agency/{id}")
-	public AgencyDTO getAgencyById(@PathVariable("id") Long id) {
+	public Agency getAgencyById(@PathVariable("id") Long id) {
 		return agencyService.getAgencyById(id);
 	}
 
@@ -230,6 +282,21 @@ public class UserController {
 	public String testReminder() {
 		agencyService.checkSubscriptionExpirationAndSendReminder();
 		return "Reminder check triggered!";
+	}
+	@GetMapping("/admins")
+	public List<UserDTO> getAllAdmins() {
+		List<User> user = userService.findAllAdmins();
+		List<UserDTO> dtos = UserMapper.INSTANCE.toUsersDTO(user);
+		return dtos;
+	}
+
+	@PutMapping("/{agencyId}/approve-payment")
+	public ResponseEntity<Void> approvePayment(@PathVariable Long agencyId, @RequestParam boolean approved) {
+		boolean updated = agencyService.updatePaymentApproval(agencyId, approved);
+		if (!updated) {
+			return ResponseEntity.notFound().build();
+		}
+		return ResponseEntity.ok().build();
 	}
 
 }

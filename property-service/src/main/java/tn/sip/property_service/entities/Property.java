@@ -3,22 +3,13 @@ package tn.sip.property_service.entities;
 import java.util.List;
 
 
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import tn.sip.property_service.enums.PropertyStatus;
 import tn.sip.property_service.enums.PropertyType;
+import tn.sip.property_service.enums.TypeStanding;
 
 @Entity
 @Table(name = "properties")
@@ -34,6 +25,7 @@ public class Property {
     private String title;
 
     @Column(nullable = false)
+    @Lob
     private String description;
 
     @Enumerated(EnumType.STRING)
@@ -66,11 +58,23 @@ public class Property {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private PropertyStatus propertyStatus;
+
+    @Enumerated(EnumType.STRING)
+    private TypeStanding typeStanding;
     
     private int piecesNumb;
     
     private int bathNumb;
     
     private int kitchenNumb;
+
+    private int nbrEtage;
+
+    private Double area;
+
+    private int likeCount = 0;
+
+    private Long agencyId;
+
     
 }

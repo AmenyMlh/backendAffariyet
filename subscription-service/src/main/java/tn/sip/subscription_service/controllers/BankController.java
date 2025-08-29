@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/banks")
-@CrossOrigin(origins = "http://localhost:4200")
+@RequestMapping("/banks")
+//@CrossOrigin(origins = "http://localhost:4200")
 public class BankController {
     private final BankService bankService;
 

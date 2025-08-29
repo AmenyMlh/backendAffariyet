@@ -43,6 +43,7 @@ public class JwtTokenProvider {
         if (user.getAgencyDTO() != null) {
             claims.put("subscriptionId", user.getAgencyDTO().getSubscriptionId());
             claims.put("agencyId", user.getAgencyDTO().getId());
+            claims.put("active",user.getAgencyDTO().isPaymentApproved());
         }
 
         return buildToken(claims, user, jwtExpiration);

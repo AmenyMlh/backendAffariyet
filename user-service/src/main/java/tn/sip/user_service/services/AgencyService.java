@@ -12,9 +12,10 @@ public interface AgencyService {
 	DocumentsDTO getAgencyDocumentsByUserId(DocumentsDTO documents, User user);
 	Agency saveAgency(Agency agency);
 	Agency getAgencyByUser(User userId);
-	AgencyDTO getAgencyById(Long id);
+	Agency getAgencyById(Long id);
 	Agency getAgencyByUserAndSubscriptionId(User userId, Long subscriptionId);
 	void checkSubscriptionExpirationAndSendReminder();
 	Agency updateAgency(User user, Agency updatedAgency);
 
+	boolean updatePaymentApproval(Long agencyId, boolean approved);
 }

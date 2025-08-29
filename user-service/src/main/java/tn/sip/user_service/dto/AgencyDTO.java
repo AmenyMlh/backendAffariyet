@@ -1,6 +1,7 @@
 package tn.sip.user_service.dto;
 
 import lombok.Data;
+import tn.sip.user_service.entities.User;
 
 @Data
 public class AgencyDTO {
@@ -15,5 +16,6 @@ public class AgencyDTO {
 
 	    private Long subscriptionId;
 
-	    private Long userId;
+	    private boolean isPaymentApproved;
+
 }

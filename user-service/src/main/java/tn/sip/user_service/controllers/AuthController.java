@@ -26,14 +26,15 @@ import tn.sip.user_service.dto.UserDTO;
 import tn.sip.user_service.entities.Agency;
 import tn.sip.user_service.entities.User;
 import tn.sip.user_service.enums.UserRole;
+import tn.sip.user_service.exceptions.ErrorResponse;
 import tn.sip.user_service.mappers.UserMapper;
 import tn.sip.user_service.services.AgencyService;
 import tn.sip.user_service.services.UserService;
 import tn.sip.user_service.servicesImpl.UserDetailsServiceImpl;
 
 @RestController
-@RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:4200")
+@RequestMapping("/auth")
+//@CrossOrigin(origins = "http://localhost:4200")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -52,20 +53,26 @@ public class AuthController {
 
     }
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestParam String email, @RequestParam String password) {
+    public ResponseEntity<?> login(@RequestParam String email, @RequestParam String password) {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, password));
         } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ErrorResponse("Email ou mot de passe incorrect.") {
+                    });
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Erreur lors de l'authentification : " + e.getMessage()));
         }
 
         Optional<UserDTO> optionalUserDTO = userService.getUserByEmail(email);
         if (!optionalUserDTO.isPresent()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("Utilisateur non trouvé avec l'email : " + email));
         }
 
         UserDTO userDto = optionalUserDTO.get();
-        User user= userMapper.toUser(userDto);
+        User user = userMapper.toUser(userDto);
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
         LoginResponse loginResponse = new LoginResponse();
@@ -81,8 +88,10 @@ public class AuthController {
             DocumentsDTO missingDocs = userService.getUserDocuments(email);
             loginResponse.setMissingDocuments(missingDocs);
         }
+
         return ResponseEntity.ok(loginResponse);
     }
+
 
 
     @PostMapping("/refresh-token")
